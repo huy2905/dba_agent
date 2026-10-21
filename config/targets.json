@@ -1,0 +1,5 @@
+{
+  "targets": [
+    {"id": "demo-pg", "label": "PostgreSQL Demo (mock data)", "engine": "demo"}
+  ]
+}

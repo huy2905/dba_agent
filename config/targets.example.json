@@ -1,0 +1,7 @@
+{
+  "targets": [
+    {"id": "demo-pg", "label": "PostgreSQL Demo (mock data)", "engine": "demo"},
+    {"id": "pg-prod", "label": "PostgreSQL PROD", "engine": "postgresql", "dsn_env": "PG_PROD_DSN"},
+    {"id": "mssql-prod", "label": "SQL Server PROD", "engine": "sqlserver", "dsn_env": "MSSQL_PROD_DSN"}
+  ]
+}

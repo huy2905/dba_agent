@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI DBA Agent • MVP</title>
+  <style>
+    :root{font-family:system-ui,Arial,sans-serif;color-scheme:dark;background:#0e1626;color:#e9f1fc}
+    *{box-sizing:border-box}body{margin:0}header{background:#172338;border-bottom:1px solid #30415c;padding:18px 24px}
+    main{max-width:1050px;margin:22px auto;padding:0 18px}h1{font-size:22px;margin:0 0 4px}p{color:#a6b7cb}
+    .panel{background:#172338;border:1px solid #30415c;border-radius:14px;padding:18px;margin:12px 0}
+    .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{font-size:13px;color:#b4c8dc;display:block;margin-bottom:7px}
+    select,input,textarea,button{font:inherit;border-radius:8px;padding:10px 12px}select,input,textarea{width:100%;background:#101a2c;color:#e9f1fc;border:1px solid #425470}
+    textarea{resize:vertical;min-height:90px}button{border:0;background:#3b82f6;color:white;cursor:pointer;font-weight:650}
+    button:disabled{opacity:.55;cursor:not-allowed}button.secondary{background:#2f415c;font-size:13px;margin:4px}
+    .examples{margin:14px 0}.notice{background:#2d2630;border:1px solid #634b4f;padding:10px;border-radius:9px;margin:10px 0}
+    pre{white-space:pre-wrap;word-break:break-word;background:#0d1524;padding:14px;border-radius:9px;font-size:12px}
+    table{border-collapse:collapse;width:100%;margin-top:12px;font-size:13px}td,th{border-bottom:1px solid #33435a;text-align:left;padding:8px 10px}
+    th{color:#93c5fd} .wrap{overflow:auto}.meta{font-size:12px;color:#94a9bf}.error{color:#ffb4b4}
+    @media(max-width:640px){.fields{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header><h1>🗄️ AI DBA Agent</h1><span class="meta">MVP v0.1 — fixed SQL skills • read-only • optional AI planner</span></header>
+<main>
+ <section class="panel">
+  <div class="fields">
+   <div><label for="target">Database target</label><select id="target"></select></div>
+   <div><label for="key">API key (nếu đã bật ở server)</label><input type="password" id="key" placeholder="Không lưu trên trình duyệt"></div>
+  </div>
+  <div class="examples"><span class="meta">Câu hỏi mẫu:</span><br>
+   <button class="secondary" data-msg="Kiểm tra dung lượng các database">Dung lượng DB</button>
+   <button class="secondary" data-msg="Liệt kê 10 bảng lớn nhất">Top bảng lớn</button>
+   <button class="secondary" data-msg="Kiểm tra dung lượng tablespace">Tablespace</button>
+   <button class="secondary" data-msg="Liệt kê danh sách user">Danh sách user</button>
+   <button class="secondary" data-msg="Kiểm tra user app_user có tồn tại không">User tồn tại?</button>
+  </div>
+  <label for="message">Yêu cầu kiểm tra</label><textarea id="message" placeholder="Ví dụ: Kiểm tra user app_user có tồn tại không?">Kiểm tra dung lượng các database</textarea>
+  <p><button id="send">Chạy skill</button></p>
+  <p class="meta">Lưu ý: demo sử dụng dữ liệu giả lập. Chưa có chức năng tự tạo/sửa SQL hay ghi dữ liệu DB.</p>
+ </section>
+ <section id="result" class="panel" hidden></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function headers(){const h={'Content-Type':'application/json'};if($('key').value)h['X-API-Key']=$('key').value;return h;}
+async function request(url,opts={}){const res=await fetch(url,{...opts,headers:headers()});const payload=await res.json();if(!res.ok)throw Error(payload.detail||'API error');return payload;}
+async function loadTargets(){
+ try{let targets=await request('/api/targets');$('target').innerHTML=targets.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`).join('');}
+ catch(e){$('target').innerHTML='<option value="">Cần API key hoặc API chưa sẵn sàng</option>';}
+}
+$('key').addEventListener('change',loadTargets);
+document.querySelectorAll('[data-msg]').forEach(b=>b.onclick=()=>{$('message').value=b.dataset.msg;});
+$('send').onclick=async()=>{
+ const button=$('send');button.disabled=true;$('result').hidden=false;$('result').textContent='Đang thực thi skill...';
+ try{
+  const out=await request('/api/chat',{method:'POST',body:JSON.stringify({target_id:$('target').value,message:$('message').value})});
+  const keys=out.rows.length?Object.keys(out.rows[0]):[];
+  let table=out.rows.length?`<div class="wrap"><table><thead><tr>${keys.map(k=>`<th>${escapeHtml(k)}</th>`).join('')}</tr></thead><tbody>${out.rows.map(r=>`<tr>${keys.map(k=>`<td>${escapeHtml(r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<p>Không có dòng dữ liệu phù hợp.</p>';
+  $('result').innerHTML=`<h3>${escapeHtml(out.skill_id)}</h3>${out.is_demo?'<div class="notice">⚠ Kết quả DEMO — không phải dữ liệu thật</div>':''}<p>${escapeHtml(out.message)}</p>${out.caveat?`<p class="meta">${escapeHtml(out.caveat)}</p>`:''}${table}<p class="meta">target=${escapeHtml(out.target_id)} | router=${escapeHtml(out.planner)} | ${out.duration_ms} ms</p><details><summary>Xem SQL template (đã kiểm soát)</summary><pre>${escapeHtml(out.sql_template||'Demo: không chạy SQL')}</pre></details>`;
+ }catch(e){$('result').innerHTML=`<p class="error">${escapeHtml(e.message)}</p>`;}
+ finally{button.disabled=false;}
+};
+loadTargets();
+</script>
+</body>
+</html>

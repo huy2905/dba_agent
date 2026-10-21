@@ -1,0 +1,7 @@
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+python-dotenv>=1,<2
+openai>=1.90,<3
+# Install the optional driver(s) matching your databases:
+# psycopg[binary]>=3.2,<4
+# pyodbc>=5,<6
